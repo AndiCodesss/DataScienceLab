@@ -1,0 +1,16 @@
+date,weekday,localName,name,types,is_weekend
+2016-01-01,Friday,Deň vzniku Slovenskej republiky,Day of the Establishment of the Slovak Republic,Public,0
+2016-01-06,Wednesday,Zjavenie Pána,Epiphany,Public,0
+2016-03-25,Friday,Veľkonočný piatok,Good Friday,Public,0
+2016-03-28,Monday,Veľkonočný pondelok,Easter Monday,Public,0
+2016-05-01,Sunday,Sviatok práce,International Workers' Day,Public,1
+2016-05-08,Sunday,Deň víťazstva nad fašizmom,Day of victory over fascism,Public,1
+2016-07-05,Tuesday,Sviatok svätého Cyrila a svätého Metoda,St. Cyril and Methodius Day,Public,0
+2016-08-29,Monday,Výročie Slovenského národného povstania,Slovak National Uprising anniversary,Public,0
+2016-09-01,Thursday,Deň Ústavy Slovenskej republiky,Day of the Constitution of the Slovak Republic,Public,0
+2016-09-15,Thursday,Sedembolestná Panna Mária,Day of Our Lady of the Seven Sorrows,Public,0
+2016-11-01,Tuesday,Sviatok Všetkých svätých,All Saints’ Day,Public,0
+2016-11-17,Thursday,Deň boja za slobodu a demokraciu,Struggle for Freedom and Democracy Day,Public,0
+2016-12-24,Saturday,Štedrý deň,Christmas Eve,Public,1
+2016-12-25,Sunday,Prvý sviatok vianočný,Christmas Day,Public,1
+2016-12-26,Monday,Druhý sviatok vianočný,St. Stephen's Day,Public,0

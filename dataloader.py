@@ -8,9 +8,9 @@ from pathlib import Path
 
 # --- paths -------------------------------------------------------------------
 DATA_DIR    = Path("mergingtest")
-INFO_CSV    = Path("meter_info.csv")
-HOLIDAY_CSV = Path("sk_holidays_2016.csv")
-OUT_CSV     = "raw_data.csv"
+INFO_CSV    = Path("./data/meter_info.csv")
+HOLIDAY_CSV = Path("./data/sk_holidays_2016.csv")
+OUT_CSV     = "data/raw_data.csv"
 
 # --- meter info --------------------------------------------------------------
 if not INFO_CSV.exists():
@@ -116,4 +116,4 @@ for fp in files:
     first_chunk = False
     print(f"Added {fp.name}: {len(part)} rows")
 
-print(f"✅ Done. Wrote {OUT_CSV}")
+print(f"Done. Wrote {OUT_CSV}")
