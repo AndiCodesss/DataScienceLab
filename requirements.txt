@@ -1,3 +1,6 @@
 pandas
 pathlib
 numpy
+meteostat
+requests
+tqdm

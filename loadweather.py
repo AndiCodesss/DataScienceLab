@@ -1,104 +1,191 @@
-import csv
-import logging
+#!/usr/bin/env python3
+"""
+Builds hourly (and optional 15-minute) weather data for each given ZIP code in Slovakia for 2016.
+
+Input:
+    A CSV file with columns: zip_code, longitude, latitude
+
+Output:
+    sk_weather_hourly_2016_by_zip.csv
+    sk_weather_15min_2016_by_zip.csv (optional)
+
+Dependencies:
+    pip install meteostat pandas tqdm
+
+Notes:
+    - Data source: Meteostat (https://dev.meteostat.net/, CC BY-NC 4.0)
+    - For research / university (non-commercial) use only.
+"""
+
+import os
 import time
-from datetime import date
-from itertools import zip_longest
-from pathlib import Path
-from typing import Iterable, Tuple
+from datetime import datetime
 
-import requests
+import pandas as pd
+from tqdm import tqdm
+from meteostat import Hourly, Point
 
-ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
-ZIP_DATA_FILE = Path("./data/sk_zip_coordinates_clean.csv")
-OUTPUT_FILE = Path("./data/sk_zip_weather_2016.csv")
-HOURLY_VARS = ["temperature_2m", "relativehumidity_2m", "precipitation"]
-MAX_RETRIES = 5
-BASE_SLEEP = 2.0
-SESSION = requests.Session()
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+# ---------------------------------------
+# CONFIGURATION
+# ---------------------------------------
 
+INPUT_ZIP_FILE = "./data/sk_zip_coordinates_clean.csv"  # <-- set this to your file name
 
-def iter_zip_coordinates(path: Path) -> Iterable[Tuple[str, float, float]]:
-    with path.open(newline="", encoding="utf-8") as fp:
-        reader = csv.DictReader(fp)
-        for row in reader:
-            yield row["zip_code"], float(row["latitude"]), float(row["longitude"])
+YEAR = 2016
+START = datetime(YEAR, 1, 1)
+END = datetime(YEAR, 12, 31, 23)
 
+OUTPUT_HOURLY = "sk_weather_hourly_2016_by_zip.csv"
+OUTPUT_15MIN = "sk_weather_15min_2016_by_zip.csv"
 
-def _sleep(attempt: int, retry_after: float | None) -> None:
-    delay = retry_after if retry_after else BASE_SLEEP * (2 ** (attempt - 1))
-    logger.info("Retrying in %.1f seconds", delay)
-    time.sleep(delay)
+PAUSE_EVERY_N = 50        # short pause every N ZIP codes (polite, avoids spikes)
+PAUSE_SECONDS = 2         # seconds to pause
+UPSAMPLE_TO_15MIN = True  # set False if you only need hourly data
 
+# ---------------------------------------
+# LOAD ZIP CODES
+# ---------------------------------------
 
-def fetch_weather(latitude: float, longitude: float) -> dict:
-    params = {
-        "latitude": latitude,
-        "longitude": longitude,
-        "start_date": date(2016, 1, 1).isoformat(),
-        "end_date": date(2016, 12, 31).isoformat(),
-        "hourly": HOURLY_VARS,
-        "timezone": "UTC",
-    }
-    for attempt in range(1, MAX_RETRIES + 1):
-        try:
-            response = SESSION.get(ARCHIVE_URL, params=params, timeout=60)
-            if response.status_code == 429:
-                _sleep(attempt, _retry_after(response))
-                continue
-            response.raise_for_status()
-            return response.json()
-        except requests.HTTPError as err:
-            if response.status_code >= 500 and attempt < MAX_RETRIES:
-                logger.warning("Server error %s on (%s, %s)", err, latitude, longitude)
-                _sleep(attempt, None)
-                continue
-            raise
-        except requests.RequestException as err:
-            if attempt == MAX_RETRIES:
-                raise
-            logger.warning("Network error %s on (%s, %s)", err, latitude, longitude)
-            _sleep(attempt, None)
-    raise RuntimeError("Max retries exceeded")
+def load_zip_coordinates(path: str) -> pd.DataFrame:
+    """
+    Load ZIP, longitude, latitude from user-provided file.
+    Expects columns: zip_code, longitude, latitude
+    Aggregates to one mean coordinate per ZIP if duplicates exist.
+    """
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"ZIP input file not found: {path}")
 
+    df = pd.read_csv(path)
 
-def _retry_after(response: requests.Response) -> float | None:
-    try:
-        return float(response.headers.get("Retry-After", ""))
-    except (TypeError, ValueError):
-        return None
+    required_cols = {"zip_code", "longitude", "latitude"}
+    missing = required_cols - set(df.columns)
+    if missing:
+        raise ValueError(f"Missing required columns in input file: {missing}")
 
+    # Ensure correct types
+    df["zip_code"] = df["zip_code"].astype(str)
+    df["longitude"] = pd.to_numeric(df["longitude"], errors="coerce")
+    df["latitude"] = pd.to_numeric(df["latitude"], errors="coerce")
 
-def write_enriched_rows(writer: csv.DictWriter, zip_code: str, lat: float, lon: float, data: dict) -> None:
-    hourly = data.get("hourly", {})
-    rows = zip_longest(
-        hourly.get("time", []),
-        hourly.get("temperature_2m", []),
-        hourly.get("relativehumidity_2m", []),
-        hourly.get("precipitation", []),
-        fillvalue="",
+    # Drop invalid coordinates
+    df = df.dropna(subset=["longitude", "latitude"])
+
+    # Aggregate duplicates: mean coordinate per ZIP
+    grouped = (
+        df.groupby("zip_code", as_index=False)
+        .agg({"latitude": "mean", "longitude": "mean"})
+        .rename(columns={"latitude": "lat", "longitude": "lon"})
     )
-    for ts, temp, rh, prec in rows:
-        writer.writerow(
-            {
-                "zip_code": zip_code,
-                "longitude": lon,
-                "latitude": lat,
-                "time": ts,
-                "temperature_2m": temp,
-                "relativehumidity_2m": rh,
-                "precipitation": prec,
-            }
+
+    print(f"Loaded {len(grouped)} unique ZIP codes from {path}")
+    return grouped
+
+# ---------------------------------------
+# FETCH HOURLY DATA
+# ---------------------------------------
+
+def fetch_hourly_for_zip(zip_code: str, lat: float, lon: float) -> pd.DataFrame:
+    """
+    Fetch hourly Meteostat data for a single ZIP code location.
+    Returns a DataFrame with columns:
+        zip_code, datetime, temp, dwpt, rhum, prcp, snow, wdir, wspd, pres, tsun, etc.
+    """
+    location = Point(lat, lon)
+    data = Hourly(location, START, END).fetch()
+
+    if data.empty:
+        return pd.DataFrame()
+
+    data = data.reset_index().rename(columns={"time": "datetime"})
+    data["zip_code"] = zip_code
+
+    cols = ["zip_code", "datetime"] + [c for c in data.columns if c not in ("zip_code", "datetime")]
+    return data[cols]
+
+# ---------------------------------------
+# MAIN
+# ---------------------------------------
+
+def main():
+    zips = load_zip_coordinates(INPUT_ZIP_FILE)
+
+    # Simple resume support:
+    # If hourly output exists, skip already processed ZIP codes.
+    processed_zips = set()
+    if os.path.exists(OUTPUT_HOURLY):
+        print(f"Found existing {OUTPUT_HOURLY}, resuming from it...")
+        existing = pd.read_csv(OUTPUT_HOURLY, usecols=["zip_code"])
+        processed_zips = set(existing["zip_code"].astype(str).unique())
+        print(f"Already processed ZIP codes: {len(processed_zips)}")
+
+    zips_to_process = zips[~zips["zip_code"].isin(processed_zips)].reset_index(drop=True)
+
+    all_chunks = []
+
+    # If resuming, keep existing data in memory to append later
+    if processed_zips:
+        existing_full = pd.read_csv(OUTPUT_HOURLY, parse_dates=["datetime"])
+        all_chunks.append(existing_full)
+
+    print(f"Fetching hourly data for {len(zips_to_process)} remaining ZIP codes...")
+
+    for i, row in tqdm(zips_to_process.iterrows(), total=len(zips_to_process)):
+        zip_code = row["zip_code"]
+        lat = float(row["lat"])
+        lon = float(row["lon"])
+
+        try:
+            df_zip = fetch_hourly_for_zip(zip_code, lat, lon)
+            if not df_zip.empty:
+                all_chunks.append(df_zip)
+        except Exception as e:
+            # Log and continue with next ZIP
+            print(f"Error for ZIP {zip_code}: {e}")
+
+        if PAUSE_EVERY_N > 0 and (i + 1) % PAUSE_EVERY_N == 0:
+            time.sleep(PAUSE_SECONDS)
+
+    if not all_chunks:
+        print("No data fetched. Check your input file, network, or Meteostat service.")
+        return
+
+    # Concatenate all partial results
+    result = pd.concat(all_chunks, ignore_index=True)
+
+    # Sort by ZIP and datetime
+    result["zip_code"] = result["zip_code"].astype(str)
+    result["datetime"] = pd.to_datetime(result["datetime"])
+    result.sort_values(by=["zip_code", "datetime"], inplace=True)
+
+    # Save hourly dataset
+    result.to_csv(OUTPUT_HOURLY, index=False)
+    print(f"Saved hourly data to {OUTPUT_HOURLY}")
+    print(f"Rows: {len(result):,}, ZIP codes: {result['zip_code'].nunique()}")
+
+    # Optional: upsample to 15 minutes via linear interpolation
+    if UPSAMPLE_TO_15MIN:
+        print("Upsampling to 15-minute intervals (linear interpolation)...")
+
+        df = result.copy()
+        df = df.set_index("datetime")
+
+        # Resample per ZIP; linear interpolation for numeric columns
+        df_15 = (
+            df.groupby("zip_code")
+            .apply(lambda x: x.resample("15T").interpolate(method="linear"))
+            .reset_index(level=0, drop=True)
+            .reset_index()
         )
 
+        # Ensure column order
+        cols = ["zip_code", "datetime"] + [c for c in df_15.columns if c not in ("zip_code", "datetime")]
+        df_15 = df_15[cols]
+
+        df_15.to_csv(OUTPUT_15MIN, index=False)
+        print(f"Saved 15-minute data to {OUTPUT_15MIN}")
+        print(f"Rows: {len(df_15):,}, ZIP codes: {df_15['zip_code'].nunique()}")
+
+    print("Done.")
 
 if __name__ == "__main__":
-    OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with OUTPUT_FILE.open("w", newline="", encoding="utf-8") as fp:
-        fieldnames = ["zip_code", "longitude", "latitude", "time", *HOURLY_VARS]
-        writer = csv.DictWriter(fp, fieldnames=fieldnames)
-        writer.writeheader()
-        for zip_code, lat, lon in iter_zip_coordinates(ZIP_DATA_FILE):
-            weather = fetch_weather(lat, lon)
-            write_enriched_rows(writer, zip_code, lat, lon, weather)
+    main()
