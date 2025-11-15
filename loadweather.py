@@ -25,10 +25,6 @@ import pandas as pd
 from tqdm import tqdm
 from meteostat import Hourly, Point
 
-# ---------------------------------------
-# CONFIGURATION
-# ---------------------------------------
-
 INPUT_ZIP_FILE = "./data/sk_zip_coordinates_clean.csv"  # <-- set this to your file name
 
 YEAR = 2016
@@ -80,10 +76,6 @@ def load_zip_coordinates(path: str) -> pd.DataFrame:
     print(f"Loaded {len(grouped)} unique ZIP codes from {path}")
     return grouped
 
-# ---------------------------------------
-# FETCH HOURLY DATA
-# ---------------------------------------
-
 def fetch_hourly_for_zip(zip_code: str, lat: float, lon: float) -> pd.DataFrame:
     """
     Fetch hourly Meteostat data for a single ZIP code location.
@@ -101,10 +93,6 @@ def fetch_hourly_for_zip(zip_code: str, lat: float, lon: float) -> pd.DataFrame:
 
     cols = ["zip_code", "datetime"] + [c for c in data.columns if c not in ("zip_code", "datetime")]
     return data[cols]
-
-# ---------------------------------------
-# MAIN
-# ---------------------------------------
 
 def main():
     zips = load_zip_coordinates(INPUT_ZIP_FILE)

@@ -38,6 +38,16 @@ def main() -> None:
             if record is None:
                 continue
             unique_rows.add(record)
+            
+    # remove duplicate zip codes keeping the first occurrence from unique_rows
+    seen_zips: Set[str] = set()
+    filtered_rows: Set[Tuple[str, float, float]] = set()
+    for row in unique_rows:
+        if row[0] not in seen_zips:
+            seen_zips.add(row[0])
+            filtered_rows.add(row)
+    unique_rows = filtered_rows
+    
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     with OUTPUT_PATH.open("w", newline="", encoding="utf-8") as dst:
         writer = csv.writer(dst)
