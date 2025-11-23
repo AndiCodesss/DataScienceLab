@@ -1,0 +1,289 @@
+================================================================================
+EXPLORATORY DATA ANALYSIS - INTERPRETATION REPORT
+
+Total Records: 9,475,848 | Meters: 1,000 | Data Completeness: 99.70%
+
+================================================================================
+EXECUTIVE SUMMARY
+================================================================================
+
+The EDA reveals strong temporal patterns in Slovak household energy consumption,
+with clear daily, weekly, and seasonal cycles. However, weather impact analysis
+is severely limited by data availability issues from the Meteostat API, particularly
+for precipitation (99.98% missing) and temperature (22.07% missing).
+
+Key Insight: Energy consumption is primarily driven by human behavioral patterns
+(time of day, weekday/weekend) and seasonal temperature variations, with a
+moderate negative correlation to temperature (-0.0597).
+
+================================================================================
+1. TEMPORAL CONSUMPTION PATTERNS - INTERPRETATION
+================================================================================
+
+DAILY PATTERNS:
+---------------
+• Peak Hour: 21:00 (4.542 kWh) - Evening peak when families are home
+• Valley Hour: 15:00 (3.676 kWh) - Afternoon minimum during work/school hours
+• Peak-to-Valley Ratio: 1.24x - Relatively modest variation
+
+Interpretation: The consumption pattern follows typical residential behavior:
+- Morning rise (6-9 AM): 3.984 kWh - People preparing for work/school
+- Daytime low (10 AM-4 PM): ~3.7-3.9 kWh - Many residents away from home
+- Evening peak (5-9 PM): 4.282 kWh - Cooking, heating, entertainment
+- Night decline (10 PM-5 AM): ~3.9-4.0 kWh - Sleep period
+
+WEEKLY PATTERNS:
+----------------
+• Weekday Average: 4.262 kWh
+• Weekend Average: 3.540 kWh (83% of weekday consumption)
+• Peak Day: Wednesday (4.336 kWh)
+• Lowest Day: Sunday (3.415 kWh)
+
+Interpretation: 17% lower weekend consumption suggests:
+- Commercial/industrial influence in residential areas
+- Different lifestyle patterns (going out, traveling)
+- Less structured daily routines on weekends
+
+HOLIDAY EFFECT:
+---------------
+• Holiday consumption: 3.409 kWh (16.42% lower than non-holidays)
+
+Interpretation: Similar to weekends, indicating reduced economic activity
+and potentially travel away from primary residences.
+
+================================================================================
+2. SEASONAL PATTERNS - INTERPRETATION
+================================================================================
+
+MONTHLY VARIATIONS:
+-------------------
+• Winter Peak: December-February (4.43 kWh average)
+• Summer Valley: June-August (3.69 kWh average)
+• Winter/Summer Ratio: 1.20x
+
+Interpretation: 20% higher winter consumption driven by:
+- Heating requirements in cold months
+- Longer darkness hours requiring more lighting
+- More time spent indoors
+
+TEMPERATURE RELATIONSHIP:
+-------------------------
+• Temperature Correlation: -0.0597 (weak negative)
+• Optimal Temperature: -10.7°C (unexpected - likely data artifact)
+• Cold Days (<-3.2°C): 4.631 kWh
+• Mild Days: 4.209 kWh
+• Hot Days (>22.7°C): 3.783 kWh
+
+Interpretation: The weak negative correlation and unusual "optimal" temperature
+suggest a non-linear relationship. Consumption increases with both extreme cold
+(heating) and possibly extreme heat (cooling), though Slovakia's climate means
+cooling demand is minimal.
+
+================================================================================
+3. HOUSEHOLD BEHAVIOR ANALYSIS - INTERPRETATION
+================================================================================
+
+CONSUMPTION DISTRIBUTION:
+-------------------------
+• Mean: 97.02 kWh/day per household
+• Median: 75.63 kWh/day (22% lower than mean)
+• Range: 0 to 763.70 kWh/day
+
+Interpretation: Highly right-skewed distribution indicates:
+- Few very high consumers pulling up the average
+- Most households consume less than the mean
+- Potential commercial/industrial meters in "residential" classification
+
+EXTREME CONSUMERS:
+------------------
+• Top Consumer (Meter 754): 763.70 kWh/day - Likely commercial/industrial
+• Problem Meter (159): 0.00 kWh/day - Inactive or faulty meter
+• 1 meter with constant zero consumption - Data quality issue
+
+CONSUMER SEGMENTS (Quartiles):
+-------------------------------
+• Low (≤39.47 kWh/day): 250 households - Apartments/small homes
+• Medium-Low (39.47-75.63): 250 households - Average family homes
+• Medium-High (75.63-126.46): 250 households - Larger homes
+• High (>126.46): 250 households - Large homes/small businesses
+
+VARIABILITY:
+------------
+• Average Coefficient of Variation: 0.417 (41.7% variability)
+
+Interpretation: Moderate variability suggests relatively consistent consumption
+patterns, though some households show high variability possibly due to:
+- Intermittent occupancy (vacation homes)
+- Variable business operations
+- Behavioral changes
+
+================================================================================
+4. REGIONAL PATTERNS - INTERPRETATION
+================================================================================
+
+REGIONAL CONSUMPTION:
+---------------------
+1. Bratislavský kraj: 4.498 kWh avg (138 meters, 19.6% of total)
+   - Capital region, higher urbanization, higher income
+   - Peak at 9:00 AM (business district influence)
+
+2. Nitriansky kraj: 3.696 kWh avg (231 meters, 27.1% of total)
+   - Agricultural region, moderate consumption
+   - Peak at 9:00 AM (agricultural/industrial activity)
+
+3. Trnavský kraj: 3.532 kWh avg (476 meters, 53.3% of total)
+   - Lowest consumption despite having most meters
+   - Peak at 21:00 (residential character)
+
+Interpretation: Regional differences reflect:
+- Economic development levels (Bratislava highest)
+- Urban vs rural patterns
+- Industrial/commercial presence
+- Building types and efficiency
+
+TEMPERATURE DIFFERENCES:
+------------------------
+• Range: 9.3°C (Nitriansky) to 9.5°C (Bratislavský)
+• Minimal variation (0.2°C) - Not explaining consumption differences
+
+================================================================================
+5. WEATHER DATA LIMITATIONS - CRITICAL ISSUES
+================================================================================
+
+DATA AVAILABILITY PROBLEMS:
+----------------------------
+• Temperature: 22.07% missing (218 meters without weather stations)
+• Humidity: 22.07% missing (same meters as temperature)
+• Wind Speed: 25.09% missing
+• Precipitation: 99.98% missing (only 1,764 records out of 9.5M!)
+• Pressure: Partial coverage
+
+ROOT CAUSE - METEOSTAT API LIMITATIONS:
+----------------------------------------
+1. Limited weather station network in Slovakia
+2. 99 ZIP codes (30.3%) without any weather coverage
+3. Rural areas particularly affected
+4. Precipitation data essentially unusable for analysis
+
+IMPACT ON ANALYSIS:
+-------------------
+• Cannot properly assess precipitation impact on consumption
+• Temperature analysis limited to 78% of meters
+• Regional weather comparisons incomplete
+• Weather-based prediction models will have reduced accuracy
+
+CORRELATIONS (Limited Data):
+-----------------------------
+• Temperature: -0.0597 (weak negative, as expected)
+• Humidity: +0.0334 (weak positive)
+• Wind Speed: +0.0044 (negligible)
+• Precipitation: +0.0081 (unreliable due to 99.98% missing)
+• Pressure: +0.0285 (weak positive)
+
+================================================================================
+6. DATA QUALITY INSIGHTS
+================================================================================
+
+POSITIVE ASPECTS:
+-----------------
+• 99.70% data completeness for consumption
+• All 1000 meters have ZIP codes
+• Consistent hourly measurements
+• No negative consumption values
+• Clear temporal patterns visible
+
+CONCERNS:
+---------
+• 8.95% zero consumption records (848,253 records)
+• 1 meter with only zero consumption
+• 22% missing weather data
+• Precipitation data essentially absent (99.98% missing)
+• Some extremely high consumers (possible misclassification)
+
+================================================================================
+7. IMPLICATIONS FOR MODELING
+================================================================================
+
+STRONG PREDICTORS IDENTIFIED:
+------------------------------
+1. Hour of day (explains daily patterns)
+2. Day of week (17% weekend effect)
+3. Month/Season (20% winter increase)
+4. Holiday indicator (16% reduction)
+5. Regional location
+
+WEAK/PROBLEMATIC PREDICTORS:
+-----------------------------
+1. Weather variables (high missingness, weak correlations)
+2. Precipitation (unusable - 99.98% missing)
+3. Income data (indirect influence only)
+
+RECOMMENDED MODELING APPROACH:
+-------------------------------
+1. Time-series models leveraging strong temporal patterns
+2. Separate models for different consumer segments
+3. Regional stratification
+4. Imputation strategy for missing weather data
+5. Consider excluding precipitation entirely
+6. Use lagged consumption as features
+
+DATA PREPROCESSING NEEDS:
+-------------------------
+1. Impute missing weather data using regional averages
+2. Handle zero consumption records appropriately
+3. Consider removing or flagging extreme outliers
+4. Create cyclical encoding for temporal features
+5. Segment households before modeling
+
+================================================================================
+8. BUSINESS INSIGHTS
+================================================================================
+
+DEMAND PATTERNS:
+----------------
+• Predictable daily cycles enable load forecasting
+• Weekend/holiday reductions offer demand response opportunities
+• Evening peak (21:00) is primary grid stress point
+• Winter demand 20% higher requires capacity planning
+
+CUSTOMER SEGMENTATION:
+-----------------------
+• Four distinct consumption tiers identified
+• Top 10% of consumers use disproportionate energy
+• Targeted efficiency programs could focus on high consumers
+• Different tariff structures could benefit different segments
+
+REGIONAL OPPORTUNITIES:
+-----------------------
+• Bratislava's higher consumption suggests economic opportunity
+• Trnavský kraj's residential character suits distributed generation
+• Regional differences support customized energy programs
+
+================================================================================
+CONCLUSIONS
+================================================================================
+
+The Slovak energy consumption dataset reveals clear, predictable patterns driven
+primarily by human behavior and seasonal variations rather than weather conditions.
+The weak weather correlations (-0.0597 for temperature) combined with severe data
+limitations (99.98% missing precipitation) suggest that weather-based features
+will have limited predictive power.
+
+The strong temporal patterns (hourly, daily, weekly, seasonal) provide a solid
+foundation for time-series forecasting. The 17% weekend effect and 16% holiday
+reduction are substantial and consistent, making them valuable predictive features.
+
+The extreme variation in household consumption (0 to 763 kWh/day) and right-skewed
+distribution suggest the presence of non-residential meters or data quality issues
+that need addressing before modeling.
+
+KEY RECOMMENDATIONS:
+1. Focus modeling efforts on temporal patterns rather than weather
+2. Implement nearest-neighbor imputation for missing weather data
+3. Consider separate models for consumption tiers
+4. Investigate and potentially remove extreme outliers
+5. Acknowledge precipitation data as unusable for this analysis
+
+The Meteostat API limitations significantly constrain weather-based analysis,
+but the rich temporal patterns provide sufficient information for accurate
+demand forecasting and customer insights.

@@ -2,4 +2,5 @@ ds_lab_env
 .ds_lab_env
 ./ds_lab_env
 .claude
-merged_all_data.csv
+sk_weather_hourly_2016_2017_by_zip.csv
+merged_data_hourly_with_weather.csv

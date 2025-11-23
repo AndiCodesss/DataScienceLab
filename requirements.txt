@@ -3,4 +3,4 @@ pathlib
 numpy
 meteostat
 requests
-tqdm
+

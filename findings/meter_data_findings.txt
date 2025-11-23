@@ -1,0 +1,61 @@
+DATA FINDINGS - Hourly Merge Analysis
+=================================================
+
+The merge_all_data_tohourly.py script successfully aggregated 15-minute interval
+smart meter data to hourly intervals. The output contains 9,475,848 rows instead
+of the initially expected 8,784,000 rows.
+
+KEY FINDINGS
+------------
+
+1. DATA SPAN
+   - Data covers 396 days (not 366 as might be expected for 2016)
+   - Period: January 1, 2016 to January 30, 2017
+   - This adds 30 extra days beyond a standard year
+
+2. EXPECTED VS ACTUAL ROWS
+   - Expected (if complete): 1,000 meters × 396 days × 24 hours = 9,504,000 rows
+   - Actual output: 9,475,848 rows
+   - Missing: 28,152 rows (about 2.96 meters worth of complete data)
+
+3. INCOMPLETE METER DATA
+   Ten meters have incomplete data spans:
+   - Meter 29:  215 days (missing 181 days)
+   - Meter 183: 240 days (missing 156 days)
+   - Meter 261: 321 days (missing 75 days)
+   - Meter 311: 247 days (missing 149 days)
+   - Meter 357: 324 days (missing 72 days)
+   - Meter 788: 283 days (missing 113 days)
+   - Meter 820: 235 days (missing 161 days)
+   - Meter 856: 320 days (missing 76 days)
+   - Meter 933: 244 days (missing 152 days)
+   - Meter 980: 358 days (missing 38 days)
+
+   Total missing: 1,173 meter-days of data
+
+4. DAYLIGHT SAVING TIME ANOMALIES
+   - March 27, 2016: 92 intervals instead of 96 (Spring DST - lost 1 hour)
+   - October 30, 2016: 100 intervals instead of 96 (Fall DST - gained 1 hour)
+   - January 30, 2017: Only 5 intervals (partial last day of collection)
+
+HOURLY AGGREGATION METHOD
+-------------------------
+- Original data: 96 fifteen-minute intervals per day
+- Aggregated to: 24 hourly intervals per day
+- Method: Sum of 4 consecutive 15-minute values per hour
+- Data reduction: 75% fewer rows while maintaining hourly granularity
+
+OUTPUT FILE
+-----------
+- Location: data/merged_all_data_hourly.csv
+- Total rows: 9,475,848
+- Total meters: 1,000 (990 complete, 10 partial)
+- Columns: 38 (including consumption, demographics, geography, holidays)
+
+CONCLUSION
+----------
+The row count discrepancy is normal and expected for real-world meter data.
+It reflects actual data collection conditions including meter installation/removal
+dates, maintenance periods, and daylight saving time adjustments. The aggregation
+to hourly intervals was successful and reduces data volume by 75% while preserving
+all contextual information for analysis.
