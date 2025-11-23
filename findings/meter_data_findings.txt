@@ -1,9 +1,6 @@
 DATA FINDINGS - Hourly Merge Analysis
 =================================================
 
-The merge_all_data_tohourly.py script successfully aggregated 15-minute interval
-smart meter data to hourly intervals. The output contains 9,475,848 rows instead
-of the initially expected 8,784,000 rows.
 
 KEY FINDINGS
 ------------
@@ -37,25 +34,3 @@ KEY FINDINGS
    - March 27, 2016: 92 intervals instead of 96 (Spring DST - lost 1 hour)
    - October 30, 2016: 100 intervals instead of 96 (Fall DST - gained 1 hour)
    - January 30, 2017: Only 5 intervals (partial last day of collection)
-
-HOURLY AGGREGATION METHOD
--------------------------
-- Original data: 96 fifteen-minute intervals per day
-- Aggregated to: 24 hourly intervals per day
-- Method: Sum of 4 consecutive 15-minute values per hour
-- Data reduction: 75% fewer rows while maintaining hourly granularity
-
-OUTPUT FILE
------------
-- Location: data/merged_all_data_hourly.csv
-- Total rows: 9,475,848
-- Total meters: 1,000 (990 complete, 10 partial)
-- Columns: 38 (including consumption, demographics, geography, holidays)
-
-CONCLUSION
-----------
-The row count discrepancy is normal and expected for real-world meter data.
-It reflects actual data collection conditions including meter installation/removal
-dates, maintenance periods, and daylight saving time adjustments. The aggregation
-to hourly intervals was successful and reduces data volume by 75% while preserving
-all contextual information for analysis.
