@@ -74,10 +74,7 @@ TEMPERATURE RELATIONSHIP:
 • Mild Days: 4.209 kWh
 • Hot Days (>22.7°C): 3.783 kWh
 
-Interpretation: The weak negative correlation and unusual "optimal" temperature
-suggest a non-linear relationship. Consumption increases with both extreme cold
-(heating) and possibly extreme heat (cooling), though Slovakia's climate means
-cooling demand is minimal.
+Interpretation: The flat trend line, even at freezing temperatures, strongly suggests that the majority of these households do **not** use electricity for primary heating (likely using gas or district heating). The slight winter increase in overall consumption (seen in monthly stats) is likely due to lighting and increased indoor activity rather than heating load. The lack of a U-shape confirms minimal air conditioning usage as well.
 
 ================================================================================
 3. HOUSEHOLD BEHAVIOR ANALYSIS - INTERPRETATION
@@ -265,9 +262,7 @@ CONCLUSIONS
 
 The Slovak energy consumption dataset reveals clear, predictable patterns driven
 primarily by human behavior and seasonal variations rather than weather conditions.
-The weak weather correlations (-0.0597 for temperature) combined with severe data
-limitations (99.98% missing precipitation) suggest that weather-based features
-will have limited predictive power.
+The lack of correlation with temperature indicates that **electricity is not the primary heating source** for these households. Consequently, weather-based features will have limited predictive power, not just due to data limitations, but due to the fundamental nature of the consumption.
 
 The strong temporal patterns (hourly, daily, weekly, seasonal) provide a solid
 foundation for time-series forecasting. The 17% weekend effect and 16% holiday
