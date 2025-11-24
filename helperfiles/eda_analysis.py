@@ -10,8 +10,8 @@ warnings.filterwarnings('ignore')
 
 # Configuration
 DATA_FILE = Path("merged_data_hourly_with_weather.csv")
-PLOTS_DIR = Path("plots")
-PLOTS_DIR.mkdir(exist_ok=True)
+PLOTS_DIR = Path("findings/plots")
+PLOTS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Set style for better-looking plots
 plt.style.use('seaborn-v0_8-darkgrid')

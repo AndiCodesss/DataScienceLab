@@ -2,7 +2,7 @@
 COMPREHENSIVE EDA REPORT - SLOVAK ENERGY CONSUMPTION ANALYSIS
 ================================================================================
 
-Report Generated: 2025-11-23 20:19:42.745125
+Report Generated: 2025-11-24 17:10:35.864292
 Data File: merged_data_hourly_with_weather.csv
 Total Records: 9,475,848
 Date Range: 2016-01-01 00:00:00 to 2017-01-30 00:00:00
