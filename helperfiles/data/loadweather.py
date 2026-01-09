@@ -30,7 +30,7 @@ from typing import List, Tuple
 
 import pandas as pd
 from tqdm import tqdm
-from meteostat import Hourly, Point
+from meteostat import hourly, Point, stations
 
 # Configuration
 INPUT_ZIP_FILE = "./data/sk_zip_coordinates_clean.csv"
@@ -81,21 +81,41 @@ def load_zip_coordinates(path: str) -> pd.DataFrame:
 def fetch_hourly_for_zip(zip_code: str, lat: float, lon: float) -> pd.DataFrame:
     """
     Fetch hourly Meteostat data for a single ZIP code location.
+    
+    Uses stations.nearby() to find the closest station explicitly, 
+    then fetches data for that station ID.
     """
     try:
-        location = Point(lat, lon)
-        hourly_obj = Hourly(location, START, END)
-        data = hourly_obj.fetch()
-
-        if data.empty:
+        point = Point(lat, lon)
+        
+        # specific station lookup, check top 5 nearby
+        nearby_stations = stations.nearby(point)
+        # nearby() returns a DataFrame, use head() NOT fetch()
+        stations_df = nearby_stations.head(5)
+        
+        if stations_df.empty:
             return pd.DataFrame()
+        
+        # Iterate through stations to find one with data
+        for station_id in stations_df.index:
+            try:
+                # fetch data for station
+                hourly_obj = hourly(station_id, START, END)
+                data = hourly_obj.fetch()
 
-        data = data.reset_index().rename(columns={"time": "datetime"})
-        data["zip_code"] = zip_code
+                if data is not None and not data.empty:
+                    # Found valid data!
+                    data = data.reset_index().rename(columns={"time": "datetime"})
+                    data["zip_code"] = zip_code
 
-        # Reorder columns
-        cols = ["zip_code", "datetime"] + [c for c in data.columns if c not in ("zip_code", "datetime")]
-        return data[cols]
+                    # Reorder columns
+                    cols = ["zip_code", "datetime"] + [c for c in data.columns if c not in ("zip_code", "datetime")]
+                    return data[cols]
+            except Exception:
+                continue
+                
+        # If no data found in any of top 5
+        return pd.DataFrame()
     except Exception as e:
         print(f"Error fetching ZIP {zip_code}: {e}")
         return pd.DataFrame()
