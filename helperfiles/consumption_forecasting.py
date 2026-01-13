@@ -11,7 +11,8 @@ class ConsumptionForecastingData:
     def load_and_preprocess(self, target_col: str = 'consumption', 
                            zip_code: Optional[str] = None,
                            meter_id: Optional[str] = None,
-                           sample_meters: int = 0) -> pd.DataFrame:
+                           sample_meters: int = 0,
+                           cluster_file: Optional[str] = None) -> pd.DataFrame:
         """
         Loads consumption data and prepares it for forecasting.
         
@@ -20,6 +21,7 @@ class ConsumptionForecastingData:
             zip_code: Filter by ZIP (optional)
             meter_id: Filter by specific meter (optional)
             sample_meters: If > 0, randomly sample this many meters to reduce memory usage.
+            cluster_file: Path to CSV containing meter_id to cluster mappings.
         """
         print(f"Loading data from {self.data_path}...")
         
@@ -35,6 +37,32 @@ class ConsumptionForecastingData:
 
         # Optimized load
         df = pd.read_csv(self.data_path, usecols=lambda c: c in usecols, parse_dates=['timestamp'], dtype=dtype_dict)
+        
+        # Merge Clusters if provided
+        if cluster_file:
+            print(f"Loading clusters from {cluster_file}...")
+            cluster_df = pd.read_csv(cluster_file)
+            # Ensure meter_id is string and index/column match
+            if 'cluster' in cluster_df.columns:
+                # Assuming simple CSV with meter_id (or index) and cluster
+                # If meter_id is index, reset it.
+                 # Check if meter_id is in columns, else assume index
+                if 'meter_id' not in cluster_df.columns and cluster_df.index.name == 'meter_id':
+                     cluster_df = cluster_df.reset_index()
+                
+                # Ensure str type
+                if 'meter_id' in cluster_df.columns:
+                    cluster_df['meter_id'] = cluster_df['meter_id'].astype(str)
+                    
+                    df = df.merge(cluster_df[['meter_id', 'cluster']], on='meter_id', how='left')
+                    print("Merged cluster labels.")
+                    
+                    # Fill missing clusters with -1 or a specific category
+                    df['cluster'] = df['cluster'].fillna(-1).astype('int8').astype('category')
+                else:
+                    print("Warning: 'meter_id' column not found in cluster file. Skipping merge.")
+            else:
+                 print("Warning: 'cluster' column not found in cluster file. Skipping merge.")
         
         # Filter logic
         if zip_code:

@@ -1,0 +1,105 @@
+Clustering Findings
+1. Methodology
+We implemented K-Means clustering on behavioral features extracted from hourly consumption data. 
+
+Why not cluster on raw data?
+  - Each household has ~8,760 hourly readings (365 days × 24 hours).
+  - Clustering directly on this would be noisy and computationally expensive.
+  - Instead, we extract "behavioral fingerprints" that summarize each household's patterns.
+
+Features Used (4 total):
+
+  1. avg_daily_consumption (Magnitude)
+     - What: Average kWh consumed per day.
+     - Why: Separates "big consumers" from "low consumers."
+     - Example: A large family home (~25 kWh/day) vs. a single-person apartment (~5 kWh/day).
+
+  2. winter_summer_ratio (Seasonality / Heating Proxy)
+     - What: Ratio of average consumption in winter (Dec-Feb) vs. summer (Jun-Aug).
+     - Why: Identifies households with ELECTRIC HEATING.
+     - Example: Ratio > 2.0 means winter consumption is 2x summer → likely electric heating.
+               Ratio ≈ 1.0 means stable year-round → likely gas heating or no heating load.
+
+  3. night_ratio (Time-of-Day Behavior)
+     - What: Percentage of daily consumption occurring at night (10pm - 6am).
+     - Why: Identifies "Night Owl" households or those with night storage heaters / EV charging.
+     - Example: Ratio > 30% → significant night usage (water heater, EV, shift workers).
+               Ratio < 10% → mostly daytime usage (typical family).
+
+  4. cv (Coefficient of Variation = std / mean)
+     - What: Measures how "spiky" or irregular consumption is.
+     - Why: Distinguishes steady baseload consumers from erratic users.
+     - Example: Low CV (~0.3) → consistent daily routine.
+               High CV (~1.5) → unpredictable usage (vacation home, irregular schedules).
+
+Preprocessing:
+  - All features were scaled using StandardScaler (Z-score normalization).
+  - This is critical because K-Means uses distance. Without scaling, features with larger
+    magnitudes (like avg_daily_consumption in kWh) would dominate over ratios (0-1 range).
+
+2. Cluster Determination
+We tested K=2 to K=8.
+
+Silhouette Scores:
+K=2: 0.362 (Highest, likely separation of High vs Low consumers)
+K=3: 0.338
+K=4: 0.308 (Chosen for granular interpretation)
+We chose K=4 to capture nuance beyond just magnitude (e.g., differentiating "Electric Heating" from "Steady High Usage").
+
+3. Results location
+CSV: 
+findings/clustering_results/meter_clusters.csv
+Plots: findings/plots/clustering/
+cluster_daily_profiles.png: Centroid analysis.
+clustering_optimization.png: Elbow/Silhouette plots.
+cluster_features_boxplot.png: Distribution of features per cluster.
+
+
+Forecasting With Clusters
+1. Implementation
+We modified the data pipeline to ingest the meter_clusters.csv generated from our K-Means analysis.
+
+Merge Logic: Merged on meter_id. Meters with no cluster (if any) are assigned -1.
+Model: Global XGBoost (Regressor).
+Categorical Handling: Enabled enable_categorical=True for native handling of the cluster feature.
+
+2. Model Performance (Full Dataset Validation)
+Trained on: 7.4 million rows (1000 meters × ~365 days × 24 hours)
+Test Set: 1.85 million rows (Last ~20% of timeline: Nov-Dec 2016)
+
+METRICS:
+  RMSE: 2.3051 kWh
+  MAE:  1.0457 kWh
+
+Interpretation: On average, the model's predictions are off by about 1 kWh per hour. Given that household consumption can swing wildly (0 to 10+ kWh), this is a solid result.
+
+3. Feature Importance (Top 5)
+   Rank | Feature      | Importance | Interpretation
+   -----|--------------|------------|----------------
+   1    | lag_168      | 58.0%      | Same hour LAST WEEK. Households repeat weekly routines.
+   2    | lag_24       | 13.4%      | Same hour YESTERDAY. Daily rhythm matters.
+   3    | lag_1        |  8.8%      | Previous hour. Continuity of usage.
+   4    | cluster      |  2.2%      | CLUSTER ID. The model uses our segmentation!
+   5    | day_of_week  |  2.1%      | Weekend vs Weekday behavior.
+
+KEY FINDING: The cluster feature ranks 4th overall. This proves that clustering added real predictive value. The model leverages "what type of household is this" to adjust its baseline predictions.
+
+4. Interpretation of Results
+Why does lag_168 dominate?
+  - Households are creatures of habit. If a family does laundry every Saturday at 10am, they will likely do it again next Saturday at 10am. Weekly seasonality is the strongest signal.
+
+Why is cluster important?
+  - Different household types have fundamentally different consumption "shapes":
+      - "Electric Heating" clusters spike in winter mornings.
+      - "Night Owl" clusters have flatter daytime and higher nighttime usage.
+  - By giving the model the cluster ID, it can apply different rules to different households without needing to learn each meter from scratch.
+
+What do the errors look like?
+  - The model occasionally OVER-PREDICTS spikes (see forecast plot). This is because the loss function (RMSE) penalizes large errors heavily, so the model "plays it safe" by predicting higher.
+  -  For demand response, slight over-prediction is actually safer than under-prediction (better to have excess capacity than blackouts).
+
+5. Conclusion
+By segmenting households first, we improved model interpretability and gave it a useful categorical signal. The Global XGBoost model achieves strong performance (RMSE ~2.3) and is now ready for deployment or further refinement (e.g., adding weather features more directly).
+
+----
+

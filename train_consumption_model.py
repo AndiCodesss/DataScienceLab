@@ -30,6 +30,7 @@ def main():
     parser.add_argument("--horizon", type=int, default=24, help="Forecast horizon in hours")
     parser.add_argument("--meter", type=str, default=None, help="Specific Meter ID (optional)")
     parser.add_argument("--sample", type=int, default=50, help="Number of meters to sample for global model training (0 for all)")
+    parser.add_argument("--clusters", type=str, default=None, help="Path to meter_clusters.csv")
     args = parser.parse_args()
 
     # Paths
@@ -43,7 +44,8 @@ def main():
     df = loader.load_and_preprocess(
         target_col='consumption', 
         meter_id=args.meter,
-        sample_meters=args.sample
+        sample_meters=args.sample,
+        cluster_file=args.clusters
     )
     
     # Split
@@ -62,7 +64,8 @@ def main():
         max_depth=6, 
         early_stopping_rounds=50,
         n_jobs=-1,
-        random_state=42
+        random_state=42,
+        enable_categorical=True
     )
     
     # Use test set for early stopping to prevent overfitting
