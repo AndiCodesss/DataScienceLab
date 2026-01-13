@@ -46,6 +46,38 @@ K=3: 0.338
 K=4: 0.308 (Chosen for granular interpretation)
 We chose K=4 to capture nuance beyond just magnitude (e.g., differentiating "Electric Heating" from "Steady High Usage").
 
+Cluster Distribution:
+  Cluster | Households | Percentage
+  --------|------------|------------
+     0    |    442     |   44.2%
+     1    |    118     |   11.8%
+     2    |    201     |   20.1%
+     3    |    239     |   23.9%
+
+Cluster Profiles (based on daily profile plot and feature boxplots):
+
+  Cluster 0 - "Steady Low Consumers" (442 households, 44%)
+    - Consumption: Low and flat (~2-4 kWh throughout day)
+    - Profile: Minimal variation, slight evening peak
+    - Likely: Small apartments, single occupants, energy-efficient homes
+
+  Cluster 1 - "High Daytime Consumers" (118 households, 12%)
+    - Consumption: HIGHEST of all clusters (peaks at ~13 kWh at 9-11am)
+    - Profile: Strong morning ramp-up, stays high during work hours
+    - Likely: Electric heating, home offices, large families at home
+    - Note: This is the smallest but most distinctive cluster
+
+  Cluster 2 - "Minimal Consumers" (201 households, 20%)
+    - Consumption: LOWEST overall (~0.5-2 kWh, nearly flat)
+    - Profile: Almost no variation, tiny evening bump
+    - Likely: Vacation homes, uninhabited properties, or very efficient households
+
+  Cluster 3 - "Night/Evening Consumers" (239 households, 24%)
+    - Consumption: Medium range, but INVERTED pattern
+    - Profile: HIGH at night/early morning (~8 kWh), drops during day (~0.5 kWh mid-afternoon)
+    - Likely: Night storage heaters, EV charging overnight, shift workers
+    - Note: Very high night_ratio (~60-70%) in the feature boxplot
+
 3. Results location
 CSV: 
 findings/clustering_results/meter_clusters.csv
