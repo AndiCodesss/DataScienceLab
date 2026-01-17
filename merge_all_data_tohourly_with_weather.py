@@ -18,6 +18,13 @@ INCOME_CSV = Path("data/sk_income.csv")
 WEATHER_CSV = Path("sk_weather_hourly_2016_2017_by_zip.csv")
 OUTPUT_CSV = Path("merged_data_hourly_with_weather.csv")
 
+# --- Delete old output file to prevent duplicates -----------------------------
+if OUTPUT_CSV.exists():
+    print(f"\n⚠ Deleting existing {OUTPUT_CSV} to prevent duplicates...")
+    OUTPUT_CSV.unlink()
+    print("   Done.")
+
+
 # --- Load meter info ---------------------------------------------------------
 print("\n1. Loading meter info...")
 if not METER_INFO_CSV.exists():
@@ -270,27 +277,31 @@ for chunk_start in range(0, len(files), CHUNK_SIZE):
 
         # 5. Add region from ZIP code for population merge
         if "zip_code" in meter_data.columns:
+            # PLZ prefix to NUTS-3 region mapping (based on actual Slovak postal codes)
             zip_to_sk_region = {
-                '01': 'SK01', '02': 'SK01', '90': 'SK01',
-                '91': 'SK02', '92': 'SK02', '93': 'SK02',
-                '94': 'SK04', '95': 'SK04',
-                '96': 'SK03', '97': 'SK03',
-                '98': 'SK06', '99': 'SK06',
-                '03': 'SK05', '04': 'SK05', '05': 'SK05',
-                '06': 'SK07', '07': 'SK07', '08': 'SK07',
-                '09': 'SK08',
+                '81': 'SK010', '82': 'SK010', '83': 'SK010', '84': 'SK010', '85': 'SK010',  # Bratislava
+                '90': 'SK021',  # Trnava region
+                '91': 'SK022',  # Trenčín region
+                '92': 'SK023',  # Nitra region (west)
+                '93': 'SK023',  # Nitra region (east)
+                '94': 'SK032',  # Banská Bystrica region
+                '95': 'SK031',  # Žilina region
             }
             region_names = {
-                'SK01': 'Bratislavský kraj', 'SK02': 'Trnavský kraj',
-                'SK03': 'Trenčiansky kraj', 'SK04': 'Nitriansky kraj',
-                'SK05': 'Žilinský kraj', 'SK06': 'Banskobystrický kraj',
-                'SK07': 'Prešovský kraj', 'SK08': 'Košický kraj'
+                'SK010': 'Bratislavský kraj',
+                'SK021': 'Trnavský kraj',
+                'SK022': 'Trenčiansky kraj', 
+                'SK023': 'Nitriansky kraj',
+                'SK031': 'Žilinský kraj',
+                'SK032': 'Banskobystrický kraj',
             }
             region_to_city = {
-                'SK01': 'Bratislava', 'SK02': 'Trnava',
-                'SK03': 'Trenčín', 'SK04': 'Nitra',
-                'SK05': 'Žilina', 'SK06': 'Banská Bystrica',
-                'SK07': 'Prešov', 'SK08': 'Košice'
+                'SK010': 'Bratislava',
+                'SK021': 'Trnava',
+                'SK022': 'Trenčín',
+                'SK023': 'Nitra',
+                'SK031': 'Žilina',
+                'SK032': 'Banská Bystrica',
             }
 
             meter_data["sk_region_code"] = meter_data["zip_code"].str[:2].map(zip_to_sk_region)
