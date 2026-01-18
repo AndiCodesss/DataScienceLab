@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 # Database Config - Placeholders to be filled by user
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = os.getenv("DB_PORT", "5432")
-DB_NAME = os.getenv("DB_NAME", "dbapp")
+DB_NAME = os.getenv("DB_NAME", "appdb")
 DB_USER = os.getenv("DB_USER", "app")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "apppassword")
 
@@ -32,7 +32,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 # --- Path Configuration ---
-BASE_DIR = Path("..")
+BASE_DIR = Path(os.getenv("BASE_DIR", ".."))
 DATA_FILE = BASE_DIR / "merged_data_hourly_with_weather.csv"
 MODEL_FILE = Path("merged_data_hourly_with_weather_xgboost_model.json")
 
@@ -435,4 +435,4 @@ if __name__ == '__main__':
     worker_thread.start()
     
     # Run server
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host="127.0.0.1", port=5001, debug=False)

@@ -5,8 +5,10 @@ meteostat
 requests
 seaborn
 matplotlib
+scikit-learn
 
 flask
 sqlalchemy
 psycopg2-binary
 xgboost
+flask-sqlalchemy

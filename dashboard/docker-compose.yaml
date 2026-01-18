@@ -48,6 +48,27 @@ services:
     networks:
       - default
 
+  web:
+    build:
+      context: ..
+      dockerfile: dashboard/Dockerfile
+    container_name: flask_web
+    ports:
+      - "5001:5001"
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_USER: app
+      DB_PASSWORD: "apppassword"
+      DB_NAME: appdb
+    volumes:
+      - ../merged_data_hourly_with_weather.csv:/app/merged_data_hourly_with_weather.csv
+      - ../merged_data_hourly_with_weather_xgboost_model.json:/app/merged_data_hourly_with_weather_xgboost_model.json
+    depends_on:
+      - postgres
+    networks:
+      - default
+
 volumes:
   pg_data:
   pgadmin_data:

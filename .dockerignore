@@ -1,0 +1,12 @@
+# .dockerignore
+data/
+venv/
+.git/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.DS_Store
+.env
+merged_data_hourly_with_weather.csv
+merged_data_hourly_with_weather_xgboost_model.json

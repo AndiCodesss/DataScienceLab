@@ -61,12 +61,12 @@ DROP TABLE IF EXISTS forecasting_trigger;
 CREATE TABLE forecasting_trigger (
     id SERIAL PRIMARY KEY,
     region VARCHAR(50), 
-    start_date TIMESTAMP,
+    "start_date" TIMESTAMP,
     hours_ahead INT DEFAULT 24,
-    status VARCHAR(20) DEFAULT 'PENDING',
+    "status" VARCHAR(20) DEFAULT 'PENDING',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     processed_at TIMESTAMP,
-    message TEXT
+    "message" TEXT
 );
 
 -- Cloned table for forecasts
@@ -97,9 +97,9 @@ CREATE TABLE forecasts_meter_readings (
 
   weather_condition            TEXT,
 
-  weekday                      VARCHAR(10),
-  hour                         SMALLINT,
-  month                        SMALLINT,
+  "weekday"                      VARCHAR(10),
+  "hour"                         SMALLINT,
+  "month"                        SMALLINT,
   day_of_month                 SMALLINT,
   is_weekend                   BOOLEAN,
   is_holiday                   BOOLEAN,
