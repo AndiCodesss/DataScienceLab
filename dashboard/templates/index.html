@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forecast Trigger</title>
+    <style>
+        :root {
+            --bg-color: #0f172a; /* Slate 900 */
+            --card-bg: #1e293b; /* Slate 800 */
+            --input-bg: #334155; /* Slate 700 */
+            --text-color: #f8fafc; /* Slate 50 */
+            --text-secondary: #94a3b8; /* Slate 400 */
+            --primary: #3b82f6; /* Blue 500 */
+            --primary-hover: #2563eb; /* Blue 600 */
+            --border-color: #475569; /* Slate 600 */
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            padding: 20px;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--border-color);
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+            color: var(--text-color);
+        }
+        
+        p.subtitle {
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+            font-size: 0.9rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 0.75rem;
+            background-color: var(--input-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-color);
+            font-size: 1rem;
+            box-sizing: border-box;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input:focus, select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+
+        button {
+            width: 100%;
+            padding: 0.75rem;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--primary-hover);
+        }
+        
+        button:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
+        #status {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            border-radius: 6px;
+            display: none;
+            font-size: 0.9rem;
+        }
+        
+        .success {
+            background-color: rgba(34, 197, 94, 0.1);
+            color: #4ade80;
+            border: 1px solid rgba(34, 197, 94, 0.2);
+        }
+        
+        .error {
+            background-color: rgba(239, 68, 68, 0.1);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+        
+        .loading {
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            display: inline-block;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="card">
+        <h1>Generate Forecast</h1>
+        <p class="subtitle">Trigger a new energy consumption forecast task.</p>
+        
+        <form id="forecastForm">
+            <div class="form-group">
+                <label for="region">Region</label>
+                <select id="region" name="region" required>
+                    <option value="" disabled selected>Select a region...</option>
+                    {% for region in regions %}
+                    <option value="{{ region }}">{{ region }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="start_date">Start From</label>
+                <input type="datetime-local" id="start_date" name="start_date">
+                <small style="color: var(--text-secondary); display: block; margin-top: 4px;">Leave empty to start from the latest available data.</small>
+            </div>
+
+            <div class="form-group">
+                <label for="hours_ahead">Prediction Horizon (Hours)</label>
+                <input type="number" id="hours_ahead" name="hours_ahead" value="24" min="1" max="168">
+            </div>
+
+            <button type="submit" id="submitBtn">Generate Forecast</button>
+        </form>
+
+        <div id="status"></div>
+    </div>
+</div>
+
+<script>
+    document.getElementById('forecastForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const btn = document.getElementById('submitBtn');
+        const statusDiv = document.getElementById('status');
+        const formData = new FormData(e.target);
+        
+        const data = {
+            region: formData.get('region'),
+            start_date: formData.get('start_date') || null,
+            hours_ahead: parseInt(formData.get('hours_ahead'))
+        };
+        
+        // Reset UI
+        btn.disabled = true;
+        btn.innerHTML = '<span class="loading"></span> Processing...';
+        statusDiv.style.display = 'none';
+        statusDiv.className = '';
+        
+        try {
+            const response = await fetch('/trigger', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+            
+            const result = await response.json();
+            
+            statusDiv.style.display = 'block';
+            
+            if (response.ok) {
+                statusDiv.className = 'success';
+                statusDiv.innerText = `Success! Task ID: ${result.task_id}. Status: ${result.status}`;
+            } else {
+                statusDiv.className = 'error';
+                statusDiv.innerText = `Error: ${result.error || 'Unknown error'}`;
+            }
+        } catch (error) {
+            statusDiv.style.display = 'block';
+            statusDiv.className = 'error';
+            statusDiv.innerText = `Network Error: ${error.message}`;
+        } finally {
+            btn.disabled = false;
+            btn.innerText = 'Generate Forecast';
+        }
+    });
+
+    // Set default date to now (optional, but good for UX)
+    // const now = new Date();
+    // now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    // document.getElementById('start_date').value = now.toISOString().slice(0, 16);
+</script>
+
+</body>
+</html>

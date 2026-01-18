@@ -1,0 +1,58 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: local-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: apppassword
+      POSTGRES_DB: appdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d appdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - default
+      
+  pgadmin:
+    image: dpage/pgadmin4:8
+    container_name: local-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@dslab.at
+      PGADMIN_DEFAULT_PASSWORD: adminpassword
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - default
+
+  metabase:
+    image: metabase/metabase:latest
+    container_name: local-metabase
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    networks:
+      - default
+
+volumes:
+  pg_data:
+  pgadmin_data:
+
+networks:
+  default:
+    name: local-dev-net
+    driver: bridge

@@ -6,3 +6,7 @@ requests
 seaborn
 matplotlib
 
+flask
+sqlalchemy
+psycopg2-binary
+xgboost
