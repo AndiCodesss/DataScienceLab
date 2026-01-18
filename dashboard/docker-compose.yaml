@@ -56,7 +56,7 @@ services:
     ports:
       - "5001:5001"
     environment:
-      DB_HOST: db
+      DB_HOST: postgres
       DB_PORT: "5432"
       DB_USER: app
       DB_PASSWORD: "apppassword"

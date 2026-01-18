@@ -14,6 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy app code
 # Copy helper files
 COPY helperfiles/ helperfiles/
+COPY findings/ findings/
 # Copy dashboard code into a dashboard subdirectory
 COPY dashboard/ dashboard/
 
