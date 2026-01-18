@@ -20,10 +20,10 @@ COPY dashboard/ dashboard/
 
 # Flask should listen on all interfaces in container
 ENV PYTHONUNBUFFERED=1
-ENV PORT=5000
+ENV PORT=5001
 ENV BASE_DIR=.
 
-EXPOSE 5000
+EXPOSE 5001
 
 # Start command (adjust the path to your entry file)
 CMD ["python", "dashboard/flask_app.py"]

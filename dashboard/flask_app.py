@@ -31,6 +31,35 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
+# --- Embedding / Security Headers ---
+# CSP frame-ancestors controls which sites may embed this app in an <iframe>.
+# Example env: FRAME_ANCESTORS="'self' https://metabase.example.com"
+FRAME_ANCESTORS = os.getenv("FRAME_ANCESTORS", "'self'")
+
+# If you embed cross-site and need cookies/sessions, you typically need SameSite=None; Secure
+# (Only relevant if you use sessions/auth cookies. Your current app does not show login.)
+ENABLE_CROSS_SITE_COOKIES = os.getenv("ENABLE_CROSS_SITE_COOKIES", "false").lower() == "true"
+
+if ENABLE_CROSS_SITE_COOKIES:
+    app.config.update(
+        SESSION_COOKIE_SAMESITE="None",
+        SESSION_COOKIE_SECURE=True,
+    )
+
+@app.after_request
+def add_security_headers(response):
+    # Remove X-Frame-Options if set by server/proxy or extensions; CSP should control embedding.
+    response.headers.pop("X-Frame-Options", None)
+
+    # Allow embedding only by listed ancestors
+    response.headers["Content-Security-Policy"] = f"frame-ancestors {FRAME_ANCESTORS};"
+
+    # Optional hardening (safe defaults)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+
+    return response
+
 # --- Path Configuration ---
 BASE_DIR = Path(os.getenv("BASE_DIR", Path(__file__).resolve().parent.parent))
 DATA_FILE = BASE_DIR / "merged_data_hourly_with_weather.csv"

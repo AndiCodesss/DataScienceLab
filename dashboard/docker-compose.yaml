@@ -61,6 +61,7 @@ services:
       DB_USER: app
       DB_PASSWORD: "apppassword"
       DB_NAME: appdb
+      FRAME_ANCESTORS: "http://localhost:3000"
     volumes:
       - ../merged_data_hourly_with_weather.csv:/app/merged_data_hourly_with_weather.csv
       - ../merged_data_hourly_with_weather_xgboost_model.json:/app/merged_data_hourly_with_weather_xgboost_model.json
