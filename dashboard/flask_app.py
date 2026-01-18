@@ -32,9 +32,10 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 # --- Path Configuration ---
-BASE_DIR = Path(os.getenv("BASE_DIR", ".."))
+BASE_DIR = Path(os.getenv("BASE_DIR", Path(__file__).resolve().parent.parent))
 DATA_FILE = BASE_DIR / "merged_data_hourly_with_weather.csv"
-MODEL_FILE = Path("merged_data_hourly_with_weather_xgboost_model.json")
+CLUSTER_FILE = BASE_DIR / "findings/clustering_results/meter_clusters.csv"
+MODEL_FILE = BASE_DIR / "merged_data_hourly_with_weather_xgboost_model.json"
 
 # Add helper directory to path for imports
 sys.path.append(str(BASE_DIR))
@@ -48,7 +49,7 @@ state = {
     "model": None,
     "df": None,
     "meters": [],
-    "regions": []
+    "regions": ["Bratislavský kraj", "Trnavský kraj", "Nitriansky kraj"]
 }
 
 # --- Database Models ---
@@ -80,8 +81,8 @@ class ForecastsMeterReading(db.Model):
     consumption = db.Column(db.Float)
     
     # Metadata columns
-    laggingReactivePower = db.Column(db.Float, nullable=True)
-    leadingReactivePower = db.Column(db.Float, nullable=True)
+    laggingReactivePower = db.Column("laggingreactivepower", db.Float, nullable=True)
+    leadingReactivePower = db.Column("leadingreactivepower", db.Float, nullable=True)
     temperature = db.Column(db.Float, nullable=True)
     dew_point = db.Column(db.Float, nullable=True)
     relative_humidity = db.Column(db.Float, nullable=True)
@@ -187,7 +188,7 @@ def run_forecast_logic(meter_id: str, start_time: pd.Timestamp, hours_ahead: int
     # We need a local cache of predictions to use as lags
     predictions_cache = {} # timestamp -> value
     
-    feature_cols = ['is_weekend', 'is_holiday', 'hour_sin', 'hour_cos', 'day_sin', 'day_cos'] + \
+    feature_cols = ['is_weekend', 'is_holiday', 'cluster', 'hour_sin', 'hour_cos', 'day_sin', 'day_cos'] + \
                    [f'lag_{i}' for i in range(1, 25)] + ['lag_168', 'day_of_week']
                    
     lags = list(range(1, 25)) + [168]
@@ -206,11 +207,18 @@ def run_forecast_logic(meter_id: str, start_time: pd.Timestamp, hours_ahead: int
         is_weekend = int(day_of_week >= 5)
         is_holiday = 0
         
+        # Get cluster (safe extraction)
+        cluster_val = -1
+        if 'cluster' in meter_history.columns:
+            # Assuming cluster is constant for the meter, take first valid
+            cluster_val = meter_history['cluster'].iloc[0]
+        
         row_dict = {
             'hour_sin': hour_sin, 'hour_cos': hour_cos,
             'day_sin': day_sin, 'day_cos': day_cos,
             'day_of_week': day_of_week,
-            'is_weekend': is_weekend, 'is_holiday': is_holiday
+            'is_weekend': is_weekend, 'is_holiday': is_holiday,
+            'cluster': cluster_val
         }
         
         # Lags
@@ -222,6 +230,8 @@ def run_forecast_logic(meter_id: str, start_time: pd.Timestamp, hours_ahead: int
                 val = predictions_cache[lookup_ts]
             elif lookup_ts in meter_history.index:
                 val = meter_history.loc[lookup_ts]['consumption']
+                if isinstance(val, pd.Series):
+                    val = val.iloc[0] # Handle duplicates
             else:
                 val = np.nan # Missing data
             
@@ -231,7 +241,8 @@ def run_forecast_logic(meter_id: str, start_time: pd.Timestamp, hours_ahead: int
         X_step = pd.DataFrame([row_dict])
         
         # Predict
-        pred_val = float(state["model"].predict(X_step[feature_cols])[0])
+        # Explicitly cast to float to satisfy XGBoost strict checking
+        pred_val = float(state["model"].predict(X_step[feature_cols].astype(float))[0])
         
         # Store in cache for next steps
         predictions_cache[target_ts] = pred_val
@@ -241,6 +252,7 @@ def run_forecast_logic(meter_id: str, start_time: pd.Timestamp, hours_ahead: int
             meter_id=int(meter_id),
             timestamp=target_ts,
             date=target_ts.date(),
+            interval_index=target_ts.hour,
             consumption=pred_val,
             hour=target_ts.hour,
             day_of_month=target_ts.day,
@@ -261,6 +273,8 @@ def process_trigger(trigger):
         subset_meters = state['meters']
         if trigger.region:
             df = state['df']
+            if df is None:
+                raise RuntimeError("Dataframe is not loaded. Ensure DATA_FILE exists and is readable.")
             meters_in_region = []
             unique_meter_ids = df.index.get_level_values('meter_id').unique()
             
@@ -349,10 +363,10 @@ def load_resources():
         loader = ConsumptionForecastingData(str(DATA_FILE))
         # Load a sample for demo purposes.
         # Ensure region_name is loaded (we updated the helper).
-        df = loader.load_and_preprocess(target_col='consumption', sample_meters=50)
+        df = loader.load_and_preprocess(target_col='consumption', sample_meters=50, cluster_file=str(CLUSTER_FILE))
         
         state["df"] = df.set_index(['meter_id', 'timestamp']).sort_index()
-        state["meters"] = df.index.get_level_values('meter_id').unique().tolist()
+        state["meters"] = state["df"].index.get_level_values('meter_id').unique().tolist()
         if 'region_name' in df.columns:
             state["regions"] = sorted(df['region_name'].dropna().astype(str).unique().tolist())
         else:

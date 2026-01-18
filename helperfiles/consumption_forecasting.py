@@ -26,11 +26,12 @@ class ConsumptionForecastingData:
         print(f"Loading data from {self.data_path}...")
         
         # Load necessary columns
-        usecols = ['timestamp', 'meter_id', 'zip_code', 'date', 'hour', 'is_holiday', 'is_weekend', target_col]
+        usecols = ['timestamp', 'meter_id', 'zip_code', 'date', 'hour', 'is_holiday', 'is_weekend', 'region_name', target_col]
         
         dtype_dict = {
             'meter_id': 'str',
             'zip_code': 'str',
+            'region_name': 'category',
             'season': 'category',
             target_col: 'float32'
         }

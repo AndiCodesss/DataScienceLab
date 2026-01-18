@@ -23,9 +23,9 @@ CREATE TABLE meter_readings (
 
   weather_condition            TEXT,
 
-  weekday                      VARCHAR(10),
-  hour                         SMALLINT,
-  month                        SMALLINT,
+  "weekday"                      VARCHAR(10),
+  "hour"                         SMALLINT,
+  "month"                        SMALLINT,
   day_of_month                 SMALLINT,
   is_weekend                   BOOLEAN,
   is_holiday                   BOOLEAN,
@@ -72,15 +72,12 @@ CREATE TABLE forecasting_trigger (
 -- Cloned table for forecasts
 DROP TABLE IF EXISTS forecasts_meter_readings;
 CREATE TABLE forecasts_meter_readings (
-  meter_id                     INT NOT NULL,
+ meter_id                     INT NOT NULL,
   "timestamp"                  TIMESTAMP NOT NULL,
-  
-  -- Forecasted value
+  "date"                       DATE NOT NULL,
+  interval_index               INT NOT NULL,
+
   consumption                  DOUBLE PRECISION,
-  
-  -- Simplified metadata columns (nullable as they might not all be forecasted/filled immediately)
-  "date"                       DATE,
-  interval_index               INT,
   laggingReactivePower         DOUBLE PRECISION,
   leadingReactivePower         DOUBLE PRECISION,
 
@@ -113,6 +110,18 @@ CREATE TABLE forecasts_meter_readings (
   longitude                    DOUBLE PRECISION,
 
   "Population"                 DOUBLE PRECISION,
+
+  households_income_bracket_1  DOUBLE PRECISION,
+  households_income_bracket_2  DOUBLE PRECISION,
+  households_income_bracket_3  DOUBLE PRECISION,
+  households_income_bracket_4  DOUBLE PRECISION,
+  households_income_bracket_5  DOUBLE PRECISION,
+  households_income_bracket_6  DOUBLE PRECISION,
+  households_income_bracket_7  DOUBLE PRECISION,
+  households_income_bracket_8  DOUBLE PRECISION,
+  households_income_bracket_9  DOUBLE PRECISION,
+  households_income_bracket_10 DOUBLE PRECISION,
+  households_income_bracket_11 DOUBLE PRECISION,
   households_total             DOUBLE PRECISION,
 
   PRIMARY KEY (meter_id, "timestamp")

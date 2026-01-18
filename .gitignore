@@ -5,3 +5,6 @@ ds_lab_env
 sk_weather_hourly_2016_2017_by_zip.csv
 merged_data_hourly_with_weather.csv
 venv
+.env
+./venv
+../venv
