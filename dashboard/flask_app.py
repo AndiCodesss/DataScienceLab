@@ -62,16 +62,16 @@ def add_security_headers(response):
 
 # --- Path Configuration ---
 BASE_DIR = Path(os.getenv("BASE_DIR", Path(__file__).resolve().parent.parent))
-DATA_FILE = BASE_DIR / "merged_data_hourly_with_weather.csv"
-CLUSTER_FILE = BASE_DIR / "findings/clustering_results/meter_clusters.csv"
-MODEL_FILE = BASE_DIR / "merged_data_hourly_with_weather_xgboost_model.json"
+DATA_FILE = BASE_DIR / "data/processed/merged_data_hourly_with_weather.csv"
+CLUSTER_FILE = BASE_DIR / "outputs/results/meter_clusters.csv"
+MODEL_FILE = BASE_DIR / "outputs/models/merged_data_hourly_with_weather_xgboost_model.json"
 
-# Add helper directory to path for imports
+# Add project root to path for imports
 sys.path.append(str(BASE_DIR))
 try:
-    from helperfiles.consumption_forecasting import ConsumptionForecastingData
+    from src.utils.consumption_forecasting import ConsumptionForecastingData
 except ImportError:
-    logger.error("Could not import ConsumptionForecastingData. Ensure helperfiles directory exists.")
+    logger.error("Could not import ConsumptionForecastingData. Ensure src/utils directory exists.")
 
 # --- Global State ---
 state = {

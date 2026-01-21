@@ -1,0 +1,21 @@
+Cluster Forecasting Results
+========================================
+
+Forecast Horizon: 24 hours
+
+Performance Metrics:
+----------------------------------------
+ Cluster_Name     RMSE      MAE  Mean_Cons
+   Steady Low 0.358305 0.222128   3.551016
+ High Daytime 1.597533 1.056252  10.751759
+      Minimal 1.021215 0.564589   2.095038
+Night/Evening 0.244859 0.113362   5.129093
+
+Interpretation:
+----------------------------------------
+- MAE (Mean Absolute Error): Average prediction deviation in kWh
+- RMSE penalizes larger errors more heavily
+- Lower values indicate better forecast accuracy
+
+Best performing cluster: Night/Evening
+Average MAE across clusters: 0.4891 kWh

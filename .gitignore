@@ -1,10 +1,49 @@
-ds_lab_env
-.ds_lab_env
-./ds_lab_env
-.claude
-sk_weather_hourly_2016_2017_by_zip.csv
-merged_data_hourly_with_weather.csv
-venv
+# Virtual environments
+ds_lab_env/
+.ds_lab_env/
+venv/
+.venv/
+env/
 .env
-./venv
-../venv
+
+# Large data files (>10MB)
+*.csv
+!data/external/*.csv
+!outputs/results/*.csv
+
+# Weather data (1.4GB)
+sk_weather_hourly_2016_2017_by_zip.csv
+
+# Merged output (2.5GB)
+merged_data_hourly_with_weather.csv
+data/processed/*.csv
+
+# Raw meter JSON files (can be regenerated)
+data/raw/energy-data/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Model files (optional - comment out to include trained models)
+# outputs/models/*.json
+
+# Agent configs
+.claude/
+.gemini/

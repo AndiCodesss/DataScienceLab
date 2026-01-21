@@ -12,13 +12,13 @@ services:
     volumes:
       - pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U app -d appdb"]
+      test: [ "CMD-SHELL", "pg_isready -U app -d appdb" ]
       interval: 5s
       timeout: 3s
       retries: 20
     networks:
       - default
-      
+
   pgadmin:
     image: dpage/pgadmin4:8
     container_name: local-pgadmin
@@ -63,8 +63,8 @@ services:
       DB_NAME: appdb
       FRAME_ANCESTORS: "http://localhost:3000"
     volumes:
-      - ../merged_data_hourly_with_weather.csv:/app/merged_data_hourly_with_weather.csv
-      - ../merged_data_hourly_with_weather_xgboost_model.json:/app/merged_data_hourly_with_weather_xgboost_model.json
+      - ../data/processed:/app/data/processed
+      - ../outputs:/app/outputs
     depends_on:
       - postgres
     networks:
@@ -73,6 +73,7 @@ services:
 volumes:
   pg_data:
   pgadmin_data:
+
 
 networks:
   default:

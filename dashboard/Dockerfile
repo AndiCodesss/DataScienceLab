@@ -12,9 +12,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy app code
-# Copy helper files
-COPY helperfiles/ helperfiles/
-COPY findings/ findings/
+# Copy src and outputs
+COPY src/ src/
+COPY outputs/ outputs/
 # Copy dashboard code into a dashboard subdirectory
 COPY dashboard/ dashboard/
 
