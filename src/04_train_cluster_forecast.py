@@ -1,11 +1,9 @@
 """
-04_train_cluster_forecast.py - Per-Cluster Forecasting Model
+04_train_cluster_forecast.py - Per-Cluster Forecasting Model (Panel Data Approach)
 
-This script trains separate XGBoost models for each household cluster,
-enabling more accurate aggregate forecasting at the cluster level.
-
-This is useful for grid operators who need to forecast demand for 
-different types of households (e.g., electric heating vs. steady consumers).
+This script trains separate XGBoost models for each household cluster using a PANEL DATA approach.
+Instead of aggregating first and training on the mean, it trains on individual meters
+(allowing the model to learn from local temperature) and THEN aggregates the predictions.
 
 Output:
 - outputs/plots/forecasting/cluster_*_forecast_*.png
@@ -70,12 +68,12 @@ def plot_forecast(y_true, y_pred, dates, cluster_id, horizon, filename):
     
     # Fill between for error visualization
     ax.fill_between(plot_dates, plot_true, plot_pred, alpha=0.2, color=color, label='Prediction Error')
-    ax.plot(plot_dates, plot_true, label='Actual', color='#2c3e50', linewidth=2, alpha=0.9)
-    ax.plot(plot_dates, plot_pred, label='Predicted', color=color, linewidth=2, linestyle='--', alpha=0.9)
+    ax.plot(plot_dates, plot_true, label='Actual (Aggregated)', color='#2c3e50', linewidth=2, alpha=0.9)
+    ax.plot(plot_dates, plot_pred, label='Predicted (Aggregated)', color=color, linewidth=2, linestyle='--', alpha=0.9)
     
-    ax.set_title(f'{name} Cluster - {horizon}h Ahead Forecast', fontsize=14, fontweight='bold')
+    ax.set_title(f'{name} Cluster (Aggregated) - {horizon}h Ahead Forecast', fontsize=14, fontweight='bold')
     ax.set_xlabel('Date', fontsize=11)
-    ax.set_ylabel('Avg Consumption (kWh)', fontsize=11)
+    ax.set_ylabel('Total Consumption (kWh)', fontsize=11)
     ax.legend(loc='upper right', fontsize=10)
     ax.grid(True, alpha=0.3, linestyle='-')
     
@@ -127,66 +125,6 @@ def plot_performance_comparison(results_df, horizon, filename):
                 f'{val:.1f}%', ha='center', va='bottom', fontsize=10, fontweight='bold')
     
     plt.suptitle(f'Cluster Forecasting Performance ({horizon}h Horizon)', fontsize=14, fontweight='bold', y=1.02)
-    plt.tight_layout()
-    plt.savefig(filename, dpi=150, bbox_inches='tight')
-    plt.close()
-
-
-def plot_consumption_profiles(df_agg, filename):
-    """Heatmap showing average hourly consumption by cluster."""
-    # Extract hour from timestamp
-    df_plot = df_agg.copy()
-    df_plot['hour'] = df_plot['timestamp'].dt.hour
-    
-    # Pivot to get hour x cluster matrix
-    pivot = df_plot.groupby(['cluster', 'hour'])['consumption'].mean().unstack(level=0)
-    pivot.columns = [CLUSTER_NAMES.get(c, f"Cluster {c}") for c in pivot.columns]
-    
-    fig, ax = plt.subplots(figsize=(12, 8))
-    
-    sns.heatmap(pivot, annot=True, fmt='.2f', cmap='YlOrRd', 
-                linewidths=0.5, ax=ax, cbar_kws={'label': 'Avg kWh'})
-    
-    ax.set_title('Average Hourly Consumption by Cluster', fontsize=14, fontweight='bold')
-    ax.set_xlabel('Cluster Type', fontsize=12)
-    ax.set_ylabel('Hour of Day', fontsize=12)
-    
-    plt.tight_layout()
-    plt.savefig(filename, dpi=150, bbox_inches='tight')
-    plt.close()
-
-
-def plot_daily_profiles_overlay(df_agg, filename):
-    """Line plot overlay showing consumption patterns for each cluster."""
-    # Extract hour from timestamp
-    df_plot = df_agg.copy()
-    df_plot['hour'] = df_plot['timestamp'].dt.hour
-    
-    fig, ax = plt.subplots(figsize=(12, 6))
-    
-    for cluster_id in sorted(df_plot['cluster'].unique()):
-        cluster_data = df_plot[df_plot['cluster'] == cluster_id]
-        hourly_avg = cluster_data.groupby('hour')['consumption'].mean()
-        
-        name = CLUSTER_NAMES.get(cluster_id, f"Cluster {cluster_id}")
-        color = CLUSTER_COLORS.get(cluster_id, '#333')
-        
-        ax.plot(hourly_avg.index, hourly_avg.values, 
-                label=name, color=color, linewidth=3, marker='o', markersize=5)
-    
-    ax.set_title('Daily Consumption Profiles by Cluster', fontsize=14, fontweight='bold')
-    ax.set_xlabel('Hour of Day', fontsize=12)
-    ax.set_ylabel('Avg Consumption (kWh)', fontsize=12)
-    ax.set_xticks(range(0, 24, 2))
-    ax.legend(loc='upper right', fontsize=11)
-    ax.grid(True, alpha=0.3)
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    
-    # Add time period annotations
-    ax.axvspan(0, 6, alpha=0.1, color='blue', label='Night')
-    ax.axvspan(17, 21, alpha=0.1, color='orange', label='Evening Peak')
-    
     plt.tight_layout()
     plt.savefig(filename, dpi=150, bbox_inches='tight')
     plt.close()
@@ -281,6 +219,7 @@ def plot_summary_dashboard(results_df, horizon, filename):
     Cluster Forecast Summary
     ─────────────────────────
     Horizon: {horizon} hours
+    Method: Panel Training (Bottom-Up)
     
     Best Performer:
     {results_df.loc[results_df['MAE'].idxmin(), 'Cluster_Name']}
@@ -307,6 +246,7 @@ def main():
     parser.add_argument("--data", type=str, default="data/processed/merged_data_hourly_with_weather.csv")
     parser.add_argument("--clusters", type=str, default="outputs/results/meter_clusters.csv")
     parser.add_argument("--horizon", type=int, default=24, help="Forecast horizon in hours (default 24)")
+    parser.add_argument("--sample", type=int, default=0, help="Number of meters to sample per cluster (0 for all)")
     args = parser.parse_args()
 
     # Setup
@@ -316,73 +256,88 @@ def main():
     reports_dir.mkdir(parents=True, exist_ok=True)
     
     print("=" * 60)
-    print("CLUSTER FORECASTING PIPELINE")
+    print("CLUSTER FORECASTING PIPELINE (PANEL APPROACH)")
     print("=" * 60)
     
     loader = ClusterForecastingData(args.data, args.clusters)
     
-    # 1. Load & Aggregate
-    print("\n1. Loading and aggregating data...")
-    df_agg = loader.load_aggregated_data()
+    # We iterate through clusters and load/train one by one to save memory
+    # Load cluster file to get unique clusters
+    cluster_df = pd.read_csv(args.clusters)
+    unique_clusters = sorted(cluster_df['cluster'].unique())
     
-    # 2. Generate consumption profile visualizations
-    print("\n2. Generating consumption profile visualizations...")
-    plot_daily_profiles_overlay(df_agg, plots_dir / "cluster_daily_profiles_overlay.png")
-    plot_consumption_profiles(df_agg, plots_dir / "cluster_consumption_heatmap.png")
-    print("   ✓ Daily profiles and heatmap saved")
-    
-    # 3. Features
-    print("\n3. Creating features...")
-    df_features = loader.create_features(df_agg, lags=24)
-    
-    unique_clusters = sorted(df_features['cluster'].unique())
     results = []
     all_errors = []
 
-    print(f"\n4. Training models for {len(unique_clusters)} clusters...")
+    print(f"\nTraining models for {len(unique_clusters)} clusters...")
     
-    # 4. Train per Cluster
     for cluster_id in unique_clusters:
         cluster_name = CLUSTER_NAMES.get(cluster_id, f"Cluster {cluster_id}")
         print(f"\n   --- {cluster_name} (ID: {cluster_id}) ---")
         
-        X_train, y_train, X_test, y_test, dates = loader.create_train_test_split(
+        # 1. Load Panel Data for this cluster
+        print(f"   Loading panel data...")
+        df_panel = loader.load_cluster_data(cluster_id, sample_n=args.sample)
+        
+        # 2. Features for Panel
+        df_features = loader.create_features(df_panel, lags=24)
+        
+        # 3. Split
+        X_train, y_train, X_test, y_test, test_df = loader.create_train_test_split(
             df_features, 
             target_col='consumption', 
-            horizon=args.horizon, 
-            cluster_id=cluster_id
+            horizon=args.horizon
         )
         
-        print(f"   Train samples: {len(X_train)}")
+        print(f"   Train rows: {len(X_train):,} (Individual Meter Hours)")
         
+        # 4. Train XGBoost on Panel
         model = xgb.XGBRegressor(
             n_estimators=1000,
             learning_rate=0.03,
-            max_depth=5,
+            max_depth=6,  # Slightly deeper for complex panel data
             early_stopping_rounds=50,
             n_jobs=-1,
-            random_state=42
+            random_state=42,
+            enable_categorical=True
         )
         
+        print(f"   Training XGBoost...")
         model.fit(
             X_train, y_train,
             eval_set=[(X_train, y_train), (X_test, y_test)],
             verbose=False
         )
         
-        # Predict
+        # 5. Predict on Panel
+        print(f"   Predicting & Aggregating...")
         y_pred = model.predict(X_test)
-        errors = y_pred - y_test.values
         
-        # Store errors for violin plot
+        # 6. Aggregation (Sum predictions to get Cluster Total)
+        # We need to map predictions back to timestamps
+        results_frame = pd.DataFrame({
+            'timestamp': test_df['timestamp'],
+            'y_true': y_test,
+            'y_pred': y_pred
+        })
+        
+        # Group by timestamp to get TOTAL cluster consumption
+        agg_results = results_frame.groupby('timestamp').sum().sort_index()
+        
+        # Calculate Metrics on the AGGREGATE (this is what matters for the grid)
+        y_true_agg = agg_results['y_true']
+        y_pred_agg = agg_results['y_pred']
+        dates_agg = agg_results.index
+        
+        rmse = np.sqrt(mean_squared_error(y_true_agg, y_pred_agg))
+        mae = mean_absolute_error(y_true_agg, y_pred_agg)
+        mean_cons = y_true_agg.mean()
+        
+        # Store errors for distribution plot
+        errors = y_pred_agg - y_true_agg
         for err in errors:
             all_errors.append({'cluster': cluster_id, 'error': err})
-        
-        # Metrics
-        rmse = np.sqrt(mean_squared_error(y_test, y_pred))
-        mae = mean_absolute_error(y_test, y_pred)
-        mean_cons = y_test.mean()
-        
+            
         print(f"   RMSE: {rmse:.4f} | MAE: {mae:.4f} | Error: {(mae/mean_cons)*100:.1f}%")
         
         results.append({
@@ -392,12 +347,15 @@ def main():
             'Mean_Cons': mean_cons
         })
         
-        # Individual forecast plot
+        # Individual forecast plot (Aggregated)
         plot_file = plots_dir / f"cluster_{cluster_id}_forecast_{args.horizon}h.png"
-        plot_forecast(y_test.values, y_pred, dates, cluster_id, args.horizon, plot_file)
+        plot_forecast(y_true_agg.values, y_pred_agg.values, dates_agg, cluster_id, args.horizon, plot_file)
+        
+        # Cleanup memory
+        del df_panel, df_features, X_train, y_train, X_test, y_test, results_frame, agg_results
 
-    # 5. Generate comparison visualizations
-    print("\n5. Generating comparison visualizations...")
+    # 7. Generate comparison visualizations
+    print("\nGenerating comparison visualizations...")
     res_df = pd.DataFrame(results)
     
     plot_performance_comparison(res_df, args.horizon, plots_dir / f"cluster_performance_comparison_{args.horizon}h.png")
@@ -409,9 +367,9 @@ def main():
     plot_summary_dashboard(res_df, args.horizon, plots_dir / f"cluster_forecast_dashboard_{args.horizon}h.png")
     print("   ✓ Summary dashboard saved")
     
-    # 6. Summary
+    # 8. Summary
     print("\n" + "="*60)
-    print("FINAL RESULTS")
+    print("FINAL RESULTS (Aggregated Panel Forecasts)")
     print("="*60)
     res_df['Cluster_Name'] = res_df['Cluster'].map(CLUSTER_NAMES)
     print(res_df[['Cluster_Name', 'RMSE', 'MAE', 'Mean_Cons']].to_string(index=False))
@@ -419,16 +377,17 @@ def main():
     # Save text summary
     report_file = reports_dir / "cluster_forecasting.txt"
     with open(report_file, "w") as f:
-        f.write("Cluster Forecasting Results\n")
+        f.write("Cluster Forecasting Results (Panel Based)\n")
         f.write("=" * 40 + "\n\n")
-        f.write(f"Forecast Horizon: {args.horizon} hours\n\n")
+        f.write(f"Forecast Horizon: {args.horizon} hours\n")
+        f.write("Methodology: Panel Training (Individual Meter Learning) -> Aggregation\n\n")
         f.write("Performance Metrics:\n")
         f.write("-" * 40 + "\n")
         f.write(res_df[['Cluster_Name', 'RMSE', 'MAE', 'Mean_Cons']].to_string(index=False))
         f.write("\n\n")
         f.write("Interpretation:\n")
         f.write("-" * 40 + "\n")
-        f.write("- MAE (Mean Absolute Error): Average prediction deviation in kWh\n")
+        f.write("- MAE (Mean Absolute Error): Average prediction deviation in kWh (Cluster Total)\n")
         f.write("- RMSE penalizes larger errors more heavily\n")
         f.write("- Lower values indicate better forecast accuracy\n")
         f.write(f"\nBest performing cluster: {res_df.loc[res_df['MAE'].idxmin(), 'Cluster_Name']}\n")

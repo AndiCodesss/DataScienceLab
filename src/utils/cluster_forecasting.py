@@ -9,63 +9,58 @@ class ClusterForecastingData:
         self.cluster_path = Path(cluster_path)
         self.df = None
 
-    def load_aggregated_data(self, target_col: str = 'consumption') -> pd.DataFrame:
+    def load_cluster_data(self, cluster_id: int, sample_n: int = 0) -> pd.DataFrame:
         """
-        Loads consumption data, merges with clusters, and aggregates to cluster level.
-        Returns a DataFrame indexed by [cluster, timestamp].
+        Loads consumption data for all meters (or a sample) in a specific cluster.
+        Returns a DataFrame indexed by [meter_id, timestamp].
         """
-        print(f"Loading data from {self.data_path}...")
+        print(f"Loading data for Cluster {cluster_id} from {self.data_path}...")
         
-        # 1. Load Consumption Data
-        usecols = ['timestamp', 'meter_id', 'consumption', 'temperature', 'hour', 'date']
+        # 1. Load Clusters to find relevant meters
+        cluster_df = pd.read_csv(self.cluster_path, dtype={'meter_id': 'str', 'cluster': 'int8'})
+        target_meters = cluster_df[cluster_df['cluster'] == cluster_id]['meter_id'].unique()
+        
+        print(f"Cluster {cluster_id} has {len(target_meters)} meters.")
+        
+        # Sampling logic
+        if sample_n > 0 and len(target_meters) > sample_n:
+            print(f"Sampling {sample_n} random meters for training...")
+            target_meters = np.random.choice(target_meters, sample_n, replace=False)
+
+        # 2. Load Consumption Data (Optimized: Filter while loading if possible, but here we filter after)
+        # We need to load all relevant columns
+        usecols = ['timestamp', 'meter_id', 'consumption', 'temperature', 
+                   'hour', 'date', 'is_holiday', 'is_weekend', 'day_of_week']
+        
         dtype_dict = {
             'meter_id': 'str',
             'consumption': 'float32',
             'temperature': 'float32',
-            'hour': 'int8'
+            'hour': 'int8',
+            'is_holiday': 'int8',
+            'is_weekend': 'int8'
         }
         
+        # Load and filter
         df = pd.read_csv(
             self.data_path, 
-            usecols=lambda c: c in usecols or c in ['is_holiday', 'is_weekend'], 
+            usecols=lambda c: c in usecols, 
             parse_dates=['timestamp'], 
             dtype=dtype_dict
         )
-
-        # 2. Load Clusters
-        print(f"Loading clusters from {self.cluster_path}...")
-        cluster_df = pd.read_csv(self.cluster_path, dtype={'meter_id': 'str', 'cluster': 'int8'})
         
-        # 3. Merge
-        # Inner join: We only care about meters that have a cluster assignment
-        df = df.merge(cluster_df[['meter_id', 'cluster']], on='meter_id', how='inner')
-        print(f"Merged data: {len(df):,} rows from {cluster_df['meter_id'].nunique()} meters.")
-
-        # 4. Aggregate by Cluster and Time
-        print("Aggregating by Cluster and Timestamp...")
-        
-        # Define aggregation dictionary
-        agg_dict = {
-            'consumption': 'mean',      # Representative profile (avg kWh per meter)
-            'temperature': 'mean',      # Avg temp for the region/meters
-            'is_holiday': 'max',        # 1 if holiday
-            'is_weekend': 'max'         # 1 if weekend
-        }
-        
-        # Handles potential missing cols (like is_holiday if not in source)
-        available_aggs = {k: v for k, v in agg_dict.items() if k in df.columns}
-        
-        grouped = df.groupby(['cluster', 'timestamp'], observed=True).agg(available_aggs).reset_index()
+        # Filter for our cluster's meters
+        df = df[df['meter_id'].isin(target_meters)]
         
         # Sort for time series ops
-        grouped = grouped.sort_values(['cluster', 'timestamp'])
+        df = df.sort_values(['meter_id', 'timestamp'])
         
-        self.df = grouped
+        self.df = df
         return self.df
 
     def create_features(self, df: pd.DataFrame, target_col: str = 'consumption', lags: int = 24) -> pd.DataFrame:
         """
-        Generates time-series features (lags, cyclic time) for the aggregated data.
+        Generates time-series features (lags, cyclic time) for the panel data.
         """
         print("Generating features...")
         df = df.copy()
@@ -78,11 +73,9 @@ class ClusterForecastingData:
         df['day_sin'] = np.sin(2 * np.pi * day_of_year / 365.25)
         df['day_cos'] = np.cos(2 * np.pi * day_of_year / 365.25)
         
-        df['day_of_week'] = df['timestamp'].dt.dayofweek
-
-        # 2. Lag Features (Respecting Cluster boundaries)
-        # Group by cluster so lags don't bleed between clusters
-        grouped_target = df.groupby('cluster')[target_col]
+        # 2. Lag Features (Respecting Meter boundaries in the Panel)
+        # Group by meter_id so lags are specific to the household
+        grouped_target = df.groupby('meter_id')[target_col]
         
         # Short-term lags
         for lag in range(1, lags + 1):
@@ -93,34 +86,34 @@ class ClusterForecastingData:
         
         return df
 
-    def create_train_test_split(self, df: pd.DataFrame, target_col: str, horizon: int, cluster_id: int) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, pd.Series]:
+    def create_train_test_split(self, df: pd.DataFrame, target_col: str, horizon: int) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.Series, pd.DataFrame]:
         """
-        Prepares (X, y) for a SPECIFIC cluster.
+        Prepares (X, y) for the cluster panel.
+        Returns: X_train, y_train, X_test, y_test, test_df (for aggregation)
         """
-        # Filter for specific cluster
-        cluster_data = df[df['cluster'] == cluster_id].copy()
         
         # Target: t+horizon
-        cluster_data[f'target_{horizon}h'] = cluster_data[target_col].shift(-horizon)
+        # Group by meter to shift correctly
+        df[f'target_{horizon}h'] = df.groupby('meter_id')[target_col].shift(-horizon)
         
-        # Drop NaNs
-        cluster_data = cluster_data.dropna()
+        # Drop NaNs created by lags and target shift
+        df = df.dropna()
         
-        # Split by time
-        dates = cluster_data['timestamp'].sort_values().unique()
+        # Split by time (Global cut for all meters)
+        dates = df['timestamp'].sort_values().unique()
         split_idx = int(len(dates) * 0.8)
         split_date = dates[split_idx]
         
-        train = cluster_data[cluster_data['timestamp'] < split_date]
-        test = cluster_data[cluster_data['timestamp'] >= split_date]
+        train = df[df['timestamp'] < split_date]
+        test = df[df['timestamp'] >= split_date]
         
         # Features
-        exclude = ['timestamp', 'cluster', target_col, f'target_{horizon}h']
-        features = [c for c in cluster_data.columns if c not in exclude]
+        exclude = ['timestamp', 'meter_id', 'cluster', 'date', target_col, f'target_{horizon}h']
+        features = [c for c in df.columns if c not in exclude]
         
         X_train = train[features]
         y_train = train[f'target_{horizon}h']
         X_test = test[features]
         y_test = test[f'target_{horizon}h']
         
-        return X_train, y_train, X_test, y_test, test['timestamp']
+        return X_train, y_train, X_test, y_test, test
